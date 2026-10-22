@@ -1,0 +1,429 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Budget Tracker | Dashboard</title>
+
+    <!-- Load our custom design -->
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+    <!-- Navigation -->
+    <header class="navbar">
+        <a class="brand" href="{{ url_for('index') }}">
+            ◈ <span>Budget</span>Tracker
+        </a>
+
+        <nav class="nav-links">
+            <a href="{{ url_for('index') }}">Dashboard</a>
+            <a href="#add-expense">Add Expense</a>
+            <a href="#analysis">Analytics</a>
+            <a href="#transactions">Transactions</a>
+        </nav>
+    </header>
+
+    <main class="container">
+
+        <!-- Welcome header -->
+        <section class="page-header">
+            <div>
+                <div class="eyebrow">Overview / Dashboard</div>
+                <h1>Manage your money <span class="blue">smarter.</span></h1>
+                <p>Track your spending. Build better financial habits.</p>
+            </div>
+
+            <div class="date-box">
+                ◷ &nbsp; {{ today }}
+            </div>
+        </section>
+
+        <!-- Summary cards -->
+        <section class="stats-grid">
+
+            <article class="stat-card">
+                <div class="stat-label">TOTAL EXPENSES</div>
+                <div class="stat-value green">
+                    ₹{{ "%.2f"|format(total) }}
+                </div>
+                <p class="stat-note">Based on current filters</p>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-label">TRANSACTIONS</div>
+                <div class="stat-value cyan">
+                    {{ expenses|length }}
+                </div>
+                <p class="stat-note">Matching expense records</p>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-label">ACTIVE CATEGORIES</div>
+                <div class="stat-value blue">
+                    {{ cat_labels|length }}
+                </div>
+                <p class="stat-note">Categories with expenses</p>
+            </article>
+
+        </section>
+
+        <!-- Success and error messages -->
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="flash-message">
+                        ✓ &nbsp; {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Add expense and filter forms -->
+        <section class="content-grid">
+
+            <!-- Add expense -->
+            <article class="panel" id="add-expense">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <span class="title-icon">+</span>
+                        Add New Expense
+                    </div>
+                    <p>Record where your money goes.</p>
+                </div>
+
+                <form action="{{ url_for('add_expense') }}"
+                      method="POST">
+
+                    <label for="description">Description</label>
+                    <input type="text"
+                           id="description"
+                           name="description"
+                           placeholder="e.g. Monthly groceries"
+                           maxlength="100"
+                           required>
+
+                    <div class="form-grid">
+                        <div>
+                            <label for="amount">Amount (₹)</label>
+                            <input type="number"
+                                   id="amount"
+                                   name="amount"
+                                   placeholder="0.00"
+                                   min="0.01"
+                                   step="0.01"
+                                   required>
+                        </div>
+
+                        <div>
+                            <label for="category">Category</label>
+                            <select id="category" name="category" required>
+                                {% for category in categories %}
+                                    <option value="{{ category }}">
+                                        {{ category }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <label for="date">Expense Date</label>
+                    <input type="date"
+                           id="date"
+                           name="date"
+                           value="{{ today }}"
+                           required>
+
+                    <button class="btn" type="submit">
+                        + Save Expense
+                    </button>
+                </form>
+            </article>
+
+            <!-- Filters and CSV export -->
+            <article class="panel">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <span class="title-icon">⌕</span>
+                        Filter & Export
+                    </div>
+                    <p>Find transactions for a selected period.</p>
+                </div>
+
+                <form action="{{ url_for('index') }}" method="GET">
+
+                    <div class="form-grid">
+                        <div>
+                            <label for="start">Start Date</label>
+                            <input type="date"
+                                   id="start"
+                                   name="start"
+                                   value="{{ start_str }}">
+                        </div>
+
+                        <div>
+                            <label for="end">End Date</label>
+                            <input type="date"
+                                   id="end"
+                                   name="end"
+                                   value="{{ end_str }}">
+                        </div>
+                    </div>
+
+                    <label for="categories">Expense Category</label>
+                    <select id="categories" name="categories">
+                        <option value="">All Categories</option>
+
+                        {% for category in categories %}
+                            <option value="{{ category }}"
+                                {% if selected_category == category %}
+                                    selected
+                                {% endif %}>
+                                {{ category }}
+                            </option>
+                        {% endfor %}
+                    </select>
+
+                    <div class="filter-actions">
+                        <button class="btn" type="submit">
+                            Apply Filters
+                        </button>
+
+                        <a class="btn btn-outline"
+                           href="{{ url_for('index') }}">
+                            Reset
+                        </a>
+                    </div>
+                </form>
+
+                <a class="export-link"
+                   href="{{ url_for(
+                       'export_csv',
+                       start=start_str,
+                       end=end_str,
+                       categories=selected_category
+                   ) }}">
+                    ↓ &nbsp; Download CSV Report
+                </a>
+            </article>
+
+        </section>
+
+        <!-- Analytics -->
+        <section id="analysis">
+            <div class="section-header">
+                <div class="eyebrow">Your Financial Insights</div>
+                <h2>Spending Analytics</h2>
+                <p>Understand your spending patterns at a glance.</p>
+            </div>
+
+            <div class="analytics-grid">
+
+                <!-- Category breakdown -->
+                <article class="panel">
+                    <div class="panel-heading">
+                        <div class="panel-title">
+                            <span class="title-icon">◈</span>
+                            By Category
+                        </div>
+                        <p>Expense distribution by category.</p>
+                    </div>
+
+                    {% if cat_labels %}
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Category</th>
+                                        <th class="text-right">Amount</th>
+                                        <th class="text-right">Share</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for category in cat_labels %}
+                                        <tr>
+                                            <td>{{ category }}</td>
+
+                                            <td class="text-right amount">
+                                                ₹{{ "%.2f"|format(
+                                                    cat_values[loop.index0]
+                                                ) }}
+                                            </td>
+
+                                            <td class="text-right">
+                                                {% if total > 0 %}
+                                                    {{ "%.1f"|format(
+                                                        cat_values[loop.index0]
+                                                        / total * 100
+                                                    ) }}%
+                                                {% else %}
+                                                    0%
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <strong>No category data yet</strong>
+                            Add an expense to see your breakdown.
+                        </div>
+                    {% endif %}
+                </article>
+
+                <!-- Daily breakdown -->
+                <article class="panel">
+                    <div class="panel-heading">
+                        <div class="panel-title">
+                            <span class="title-icon">◷</span>
+                            Daily Spending
+                        </div>
+                        <p>Review expenses by date.</p>
+                    </div>
+
+                    {% if day_labels %}
+                        <div class="table-wrap">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th class="text-right">Amount</th>
+                                    </tr>
+                                </thead>
+
+                                <tbody>
+                                    {% for day in day_labels %}
+                                        <tr>
+                                            <td>{{ day }}</td>
+                                            <td class="text-right amount">
+                                                ₹{{ "%.2f"|format(
+                                                    day_values[loop.index0]
+                                                ) }}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <strong>No daily records yet</strong>
+                            Your daily totals will appear here.
+                        </div>
+                    {% endif %}
+                </article>
+
+            </div>
+        </section>
+
+        <!-- Transaction history -->
+        <section id="transactions">
+            <div class="section-header">
+                <div class="eyebrow">Manage Your Records</div>
+                <h2>Transaction History</h2>
+                <p>
+                    {{ expenses|length }} matching expense records
+                </p>
+            </div>
+
+            <article class="panel">
+                {% if expenses %}
+
+                    <div class="table-wrap">
+                        <table class="data-table transaction-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th class="text-right">Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {% for expense in expenses %}
+                                    <tr>
+                                        <td>{{ expense.id }}</td>
+
+                                        <td>
+                                            {{ expense.date.isoformat() }}
+                                        </td>
+
+                                        <td>
+                                            <strong>
+                                                {{ expense.description }}
+                                            </strong>
+                                        </td>
+
+                                        <td>
+                                            <span class="category-badge">
+                                                {{ expense.category }}
+                                            </span>
+                                        </td>
+
+                                        <td class="text-right amount">
+                                            ₹{{ "%.2f"|format(
+                                                expense.amount
+                                            ) }}
+                                        </td>
+
+                                        <td>
+                                            <div class="actions">
+                                                <a class="btn btn-outline"
+                                                   href="{{ url_for(
+                                                       'edit',
+                                                       id=expense.id
+                                                   ) }}">
+                                                    Edit
+                                                </a>
+
+                                                <form method="POST"
+                                                      action="{{ url_for(
+                                                          'delete',
+                                                          id=expense.id
+                                                      ) }}">
+                                                    <button
+                                                        class="btn btn-danger"
+                                                        type="submit">
+                                                        Delete
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <p class="table-footer">
+                        Showing {{ expenses|length }} matching records.
+                    </p>
+
+                {% else %}
+                    <div class="empty-state">
+                        <strong>No transactions found</strong>
+                        Add your first expense or change your filters.
+                    </div>
+                {% endif %}
+            </article>
+        </section>
+
+    </main>
+
+    <footer class="footer">
+        <div class="brand">◈ Budget<span>Tracker</span></div>
+        <p>Make every rupee count.</p>
+    </footer>
+
+</body>
+</html>
