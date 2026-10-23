@@ -17,7 +17,7 @@ import os
 app = Flask(__name__)
 
 # Flask and database settings
-database_url = os.environ.get("DATABASE_URL")
+database_url = os.environ.get("DATABASE_URL") or os.environ.get("POSTGRES_URL")
 
 if database_url:
     if database_url.startswith("postgres://"):
@@ -37,7 +37,9 @@ app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 secret_key = os.environ.get("SECRET_KEY")
 if not secret_key and os.environ.get("VERCEL"):
-    raise RuntimeError("Set SECRET_KEY in the Vercel project environment.")
+    raise RuntimeError(
+        "Set a stable SECRET_KEY in the Vercel project environment."
+    )
 app.config["SECRET_KEY"] = secret_key or os.urandom(32)
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"

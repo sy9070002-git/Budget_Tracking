@@ -140,19 +140,24 @@ python main.py
    framework preset as **Other** (or let Vercel detect Python), then deploy.
 4. If the project was already deployed, trigger a new deployment after pushing
    the corrected `requirements.txt`.
-5. For persistent expenses, create a hosted PostgreSQL database and add its
-   connection URL as the `DATABASE_URL` environment variable in the Vercel
-   project settings, then redeploy.
+5. In **Project Settings → Environment Variables**, set:
+   - `SECRET_KEY` to a long, random value (for example, generate one with
+     `python -c "import secrets; print(secrets.token_hex(32))"`).
+   - `DATABASE_URL` to the connection URL for a hosted PostgreSQL database.
+     Vercel's standard `POSTGRES_URL` variable is also supported.
+   Apply the variables to the deployment environment and redeploy.
 
 The existing `vercel.json` sends incoming paths to the Flask app. If the
 deployed URL still shows Vercel's 404 page, check the deployment's build and
 runtime logs, confirm the project root contains `vercel.json`, and make sure
 you are opening the URL for the latest successful deployment.
 
-Without `DATABASE_URL`, the app uses SQLite locally and `/tmp` on Vercel.
-Vercel's `/tmp` storage is temporary and may not be shared between function
-instances, so it is only suitable for testing. Configure `DATABASE_URL` with a
-hosted PostgreSQL connection string to keep deployed expenses persistent.
+Without `DATABASE_URL` or `POSTGRES_URL`, the app uses SQLite locally and
+`/tmp` on Vercel. Vercel's `/tmp` storage is temporary and may not be shared
+between function instances, so it is only suitable for testing. A hosted
+PostgreSQL database is required for reliable multi-user accounts and persistent
+data on Vercel. The app uses separate accounts and associates each user's
+expenses and income with that account.
 
 ## 🔐 User accounts and existing data
 
@@ -162,10 +167,11 @@ analytics, edits, deletes, and CSV exports are scoped to that account. Passwords
 are stored as hashes, not plaintext.
 
 Set a long, randomly generated `SECRET_KEY` environment variable before
-deployment so Flask can securely sign login sessions. The app adds ownership
-columns to an existing database automatically. Older rows cannot be safely
-assigned to an account because they have no owner information, so they remain
-unassigned and are not displayed to any account.
+deployment so Flask can securely sign login sessions. Vercel startup fails
+when this variable is missing; do not replace it with a hard-coded key. The app
+adds ownership columns to an existing database automatically. Older rows
+cannot be safely assigned to an account because they have no owner information,
+so they remain unassigned and are not displayed to any account.
 
 ## 👨‍💻 Author
 
