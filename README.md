@@ -130,6 +130,25 @@ python main.py
 - Responsive web interface.
 - Secure user authentication.
 
+## ☁️ Deploying to Vercel
+
+1. Push the project to GitHub. Make sure `app.py`, `vercel.json`, and
+   `requirements.txt` are in the repository root.
+2. In Vercel, select **Add New → Project** and import the GitHub repository.
+3. Set the **Root Directory** to the folder containing those files. Leave the
+   framework preset as **Other** (or let Vercel detect Python), then deploy.
+4. If the project was already deployed, trigger a new deployment after pushing
+   the corrected `requirements.txt`.
+
+The existing `vercel.json` sends incoming paths to the Flask app. If the
+deployed URL still shows Vercel's 404 page, check the deployment's build and
+runtime logs, confirm the project root contains `vercel.json`, and make sure
+you are opening the URL for the latest successful deployment.
+
+The app currently uses SQLite. Vercel's function filesystem is temporary, so
+expenses stored in the deployed app are not reliable across deployments or
+function instances. Use a hosted database for persistent production data.
+
 ## 👨‍💻 Author
 
 **Sumit Yadav**
