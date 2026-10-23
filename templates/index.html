@@ -47,27 +47,27 @@
         <section class="stats-grid">
 
             <article class="stat-card">
-                <div class="stat-label">TOTAL EXPENSES</div>
+                <div class="stat-label">TOTAL INCOME</div>
                 <div class="stat-value green">
+                    ₹{{ "%.2f"|format(total_income) }}
+                </div>
+                <p class="stat-note">All income entries</p>
+            </article>
+
+            <article class="stat-card">
+                <div class="stat-label">TOTAL EXPENSES</div>
+                <div class="stat-value red">
                     ₹{{ "%.2f"|format(total) }}
                 </div>
                 <p class="stat-note">Based on current filters</p>
             </article>
 
             <article class="stat-card">
-                <div class="stat-label">TRANSACTIONS</div>
-                <div class="stat-value cyan">
-                    {{ expenses|length }}
-                </div>
-                <p class="stat-note">Matching expense records</p>
-            </article>
-
-            <article class="stat-card">
-                <div class="stat-label">ACTIVE CATEGORIES</div>
+                <div class="stat-label">BALANCE</div>
                 <div class="stat-value blue">
-                    {{ cat_labels|length }}
+                    ₹{{ "%.2f"|format(balance) }}
                 </div>
-                <p class="stat-note">Categories with expenses</p>
+                <p class="stat-note">Income minus expenses</p>
             </article>
 
         </section>
@@ -141,6 +141,42 @@
                     <button class="btn" type="submit">
                         + Save Expense
                     </button>
+                </form>
+            </article>
+
+            <article class="panel" id="add-income">
+                <div class="panel-heading">
+                    <div class="panel-title">
+                        <span class="title-icon">↗</span>
+                        Add New Income
+                    </div>
+                    <p>Record the money coming in.</p>
+                </div>
+
+                <form action="{{ url_for('add_income') }}" method="POST">
+                    <label for="income-description">Description</label>
+                    <input type="text" id="income-description" name="description" placeholder="e.g. Salary payment" maxlength="100" required>
+
+                    <div class="form-grid">
+                        <div>
+                            <label for="income-amount">Amount (₹)</label>
+                            <input type="number" id="income-amount" name="amount" placeholder="0.00" min="0.01" step="0.01" required>
+                        </div>
+
+                        <div>
+                            <label for="income-category">Category</label>
+                            <select id="income-category" name="category" required>
+                                {% for category in income_categories %}
+                                    <option value="{{ category }}">{{ category }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+
+                    <label for="income-date">Income Date</label>
+                    <input type="date" id="income-date" name="date" value="{{ today }}" required>
+
+                    <button class="btn" type="submit">+ Save Income</button>
                 </form>
             </article>
 
@@ -321,6 +357,55 @@
                 </article>
 
             </div>
+        </section>
+
+        <!-- Income summary -->
+        <section id="income-summary">
+            <div class="section-header">
+                <div class="eyebrow">Cash Flow</div>
+                <h2>Income History</h2>
+                <p>{{ incomes|length }} income records</p>
+            </div>
+
+            <article class="panel">
+                {% if incomes %}
+                    <div class="table-wrap">
+                        <table class="data-table transaction-table">
+                            <thead>
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Date</th>
+                                    <th>Description</th>
+                                    <th>Category</th>
+                                    <th class="text-right">Amount</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for income in incomes %}
+                                    <tr>
+                                        <td>{{ income.id }}</td>
+                                        <td>{{ income.date.isoformat() }}</td>
+                                        <td><strong>{{ income.description }}</strong></td>
+                                        <td><span class="category-badge">{{ income.category }}</span></td>
+                                        <td class="text-right amount">₹{{ "%.2f"|format(income.amount) }}</td>
+                                        <td>
+                                            <form action="{{ url_for('delete_income', id=income.id) }}" method="POST">
+                                                <button class="delete-btn" type="submit">Delete</button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                {% else %}
+                    <div class="empty-state">
+                        <strong>No income records yet</strong>
+                        Add your first income entry to track your cash flow.
+                    </div>
+                {% endif %}
+            </article>
         </section>
 
         <!-- Transaction history -->

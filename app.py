@@ -41,6 +41,14 @@ class Expense(db.Model):
     amount = db.Column(db.Float, nullable=False)
 
 
+class Income(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    description = db.Column(db.String(100), nullable=False)
+    date = db.Column(db.Date, nullable=False, default=date.today)
+    category = db.Column(db.String(100), nullable=False)
+    amount = db.Column(db.Float, nullable=False)
+
+
 # Create the database table if it does not exist
 with app.app_context():
     db.create_all()
@@ -50,6 +58,10 @@ with app.app_context():
 Categories = [
     "Food", "Transport", "Rent", "Entertainment",
     "Utilities", "Healthcare", "Other"
+]
+
+IncomeCategories = [
+    "Salary", "Freelance", "Business", "Gift", "Other"
 ]
 
 
@@ -64,7 +76,7 @@ def parse_date_or_none(value):
         return None
 
 
-# Home page: show expenses, totals and chart data
+# Home page: show expenses, income, totals and chart data
 @app.route("/")
 def index():
     start_str = (request.args.get("start") or "").strip()
@@ -105,8 +117,13 @@ def index():
         Expense.date.desc(), Expense.id.desc()
     ).all()
 
-    # Calculate the total expense
-    total = round(sum(e.amount for e in expenses), 2)
+    incomes = Income.query.order_by(
+        Income.date.desc(), Income.id.desc()
+    ).all()
+
+    total_expenses = round(sum(e.amount for e in expenses), 2)
+    total_income = round(sum(i.amount for i in incomes), 2)
+    balance = round(total_income - total_expenses, 2)
 
     # Pie chart: total expense in each category
     cat_q = db.session.query(
@@ -151,9 +168,13 @@ def index():
     return render_template(
         "index.html",
         categories=Categories,
+        income_categories=IncomeCategories,
         today=date.today().isoformat(),
         expenses=expenses,
-        total=total,
+        incomes=incomes,
+        total=total_expenses,
+        total_income=total_income,
+        balance=balance,
         start_str=start_str,
         end_str=end_str,
         selected_category=selected_category,
@@ -214,6 +235,48 @@ def add_expense():
     return redirect(url_for("index"))
 
 
+@app.route("/add-income", methods=["POST"])
+def add_income():
+    description = (request.form.get("description") or "").strip()
+    category = (request.form.get("category") or "").strip()
+    amount_str = (request.form.get("amount") or "").strip()
+    date_str = (request.form.get("date") or "").strip()
+
+    if not description or not category or not amount_str or not date_str:
+        flash("Please fill in all fields.")
+        return redirect(url_for("index"))
+
+    if category not in IncomeCategories:
+        flash("Please select a valid income category.")
+        return redirect(url_for("index"))
+
+    try:
+        amount = float(amount_str)
+        if amount <= 0:
+            raise ValueError
+    except ValueError:
+        flash("Income amount must be a positive number.")
+        return redirect(url_for("index"))
+
+    income_date = parse_date_or_none(date_str)
+    if not income_date:
+        flash("Please enter a valid date.")
+        return redirect(url_for("index"))
+
+    income = Income(
+        description=description,
+        category=category,
+        amount=amount,
+        date=income_date
+    )
+
+    db.session.add(income)
+    db.session.commit()
+
+    flash("Income added successfully.")
+    return redirect(url_for("index"))
+
+
 # Delete an expense
 @app.route("/delete/<int:id>", methods=["POST"])
 def delete(id):
@@ -223,6 +286,17 @@ def delete(id):
     db.session.commit()
 
     flash("Expense deleted successfully.")
+    return redirect(url_for("index"))
+
+
+@app.route("/delete-income/<int:id>", methods=["POST"])
+def delete_income(id):
+    income = Income.query.get_or_404(id)
+
+    db.session.delete(income)
+    db.session.commit()
+
+    flash("Income deleted successfully.")
     return redirect(url_for("index"))
 
 

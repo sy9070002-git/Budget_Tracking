@@ -218,6 +218,10 @@ hr {
     color: var(--green);
 }
 
+.red {
+    color: var(--red);
+}
+
 
 /* =========================
    5. General cards
@@ -360,6 +364,21 @@ input[type="date"] {
 
 .btn-danger:hover {
     background: #572031;
+}
+
+.delete-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid #713044;
+    border-radius: 8px;
+    background: #351723;
+    color: #fda4af;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    padding: 8px 10px;
+    cursor: pointer;
 }
 
 
