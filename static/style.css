@@ -119,64 +119,6 @@ hr {
     color: var(--blue-light);
 }
 
-.nav-user {
-    color: var(--muted);
-    font-size: 13px;
-}
-
-.nav-links form {
-    margin: 0;
-}
-
-.nav-logout {
-    padding: 0;
-    border: 0;
-    background: transparent;
-    color: #b9c6dc;
-    font: inherit;
-    font-size: 14px;
-    font-weight: 600;
-    cursor: pointer;
-}
-
-.nav-logout:hover {
-    color: var(--blue-light);
-}
-
-.auth-page {
-    min-height: 100vh;
-    display: grid;
-    place-items: center;
-    padding: 24px;
-}
-
-.auth-card {
-    width: min(440px, 100%);
-    padding: 32px;
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
-}
-
-.auth-card .section-header {
-    margin: 28px 0 22px;
-}
-
-.auth-card .section-header h1 {
-    font-size: 28px;
-}
-
-.auth-card .btn {
-    width: 100%;
-}
-
-.auth-switch {
-    margin: 20px 0 0;
-    text-align: center;
-}
-
-
 /* =========================
    3. Main page layout
 ========================= */
@@ -465,7 +407,15 @@ input[type="date"] {
     background: #10284a;
     border: 1px solid #214c82;
     border-radius: 9px;
+    color: var(--blue-light);
+    font: inherit;
     font-weight: 650;
+    cursor: pointer;
+}
+
+.export-link:hover {
+    background: #16365f;
+    color: white;
 }
 
 
@@ -593,6 +543,35 @@ input[type="date"] {
     padding: 13px 17px;
     border-radius: 10px;
     margin-bottom: 18px;
+}
+
+.flash-error {
+    background: #351723;
+    border-color: #713044;
+    color: #fda4af;
+}
+
+.local-warning {
+    background: #172c4d;
+    border: 1px solid #214c82;
+    color: #cbd7e9;
+    padding: 13px 17px;
+    border-radius: 10px;
+    margin-bottom: 18px;
+}
+
+.edit-dialog {
+    width: min(560px, calc(100% - 32px));
+    max-height: calc(100% - 32px);
+    padding: 24px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+}
+
+.edit-dialog::backdrop {
+    background: rgba(0, 0, 0, 0.7);
 }
 
 

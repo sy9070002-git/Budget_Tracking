@@ -27,14 +27,11 @@ This project will be developed step-by-step, starting with a basic Python progra
 - View transaction history.
 - Categorize transactions.
 - Calculate the remaining balance.
-- Sign up and log in with private, user-specific income and expense histories.
+- Save income and expense records automatically in the current browser.
 
 ### Planned Features
-- Save transactions using CSV files.
 - Analyze data using Pandas.
 - Create charts using Matplotlib.
-- Store data in an SQLite database.
-- Build a web dashboard using Flask.
 - Set monthly budgets and spending limits.
 
 ## 🛠️ Technologies Used
@@ -45,7 +42,7 @@ This project will be developed step-by-step, starting with a basic Python progra
 | CSV | Transaction storage |
 | Pandas | Data analysis |
 | Matplotlib | Data visualization |
-| SQLite | Database management |
+| JavaScript local storage | Browser-local transaction storage |
 | Flask | Web application |
 | HTML and CSS | Dashboard interface |
 | Git and GitHub | Version control |
@@ -63,11 +60,9 @@ Budget_Tracker/
 │
 ├── analysis.py       # Planned: data analysis
 ├── charts.py         # Planned: visualizations
-├── database.db       # Planned: SQLite database
-│
-├── app.py            # Planned: Flask application
+├── app.py            # Flask application
 ├── templates/
-│   └── index.html
+│   └── index.html    # Dashboard and browser storage logic
 │
 └── static/
     └── style.css
@@ -116,8 +111,7 @@ python main.py
 - [ ] Implement CSV data storage.
 - [ ] Perform data analysis using Pandas.
 - [ ] Create charts using Matplotlib.
-- [ ] Integrate an SQLite database.
-- [ ] Develop a Flask web dashboard.
+- [x] Develop a Flask web dashboard.
 - [ ] Add budget limits and monthly reports.
 - [ ] Deploy the application.
 
@@ -138,40 +132,20 @@ python main.py
 2. In Vercel, select **Add New → Project** and import the GitHub repository.
 3. Set the **Root Directory** to the folder containing those files. Leave the
    framework preset as **Other** (or let Vercel detect Python), then deploy.
-4. If the project was already deployed, trigger a new deployment after pushing
-   the corrected `requirements.txt`.
-5. In **Project Settings → Environment Variables**, set:
-   - `SECRET_KEY` to a long, random value (for example, generate one with
-     `python -c "import secrets; print(secrets.token_hex(32))"`).
-   - `DATABASE_URL` to the connection URL for a hosted PostgreSQL database.
-     Vercel's standard `POSTGRES_URL` variable is also supported.
-   Apply the variables to the deployment environment and redeploy.
+4. Deploy the project. If it is already deployed, push the changes and trigger
+   a new deployment. No database or login environment variables are required.
 
 The existing `vercel.json` sends incoming paths to the Flask app. If the
 deployed URL still shows Vercel's 404 page, check the deployment's build and
 runtime logs, confirm the project root contains `vercel.json`, and make sure
 you are opening the URL for the latest successful deployment.
 
-Without `DATABASE_URL` or `POSTGRES_URL`, the app uses SQLite locally and
-`/tmp` on Vercel. Vercel's `/tmp` storage is temporary and may not be shared
-between function instances, so it is only suitable for testing. A hosted
-PostgreSQL database is required for reliable multi-user accounts and persistent
-data on Vercel. The app uses separate accounts and associates each user's
-expenses and income with that account.
-
-## 🔐 User accounts and existing data
-
-The dashboard requires an account. Create one at `/register`; each new expense
-and income entry is associated with the signed-in account, and history,
-analytics, edits, deletes, and CSV exports are scoped to that account. Passwords
-are stored as hashes, not plaintext.
-
-Set a long, randomly generated `SECRET_KEY` environment variable before
-deployment so Flask can securely sign login sessions. Vercel startup fails
-when this variable is missing; do not replace it with a hard-coded key. The app
-adds ownership columns to an existing database automatically. Older rows
-cannot be safely assigned to an account because they have no owner information,
-so they remain unassigned and are not displayed to any account.
+The app stores transaction data in the browser's local storage. Data is
+available only in that browser profile on that device; it is not uploaded,
+shared with other users, or synchronized to another browser or device.
+Clearing browser storage can erase the data, so use the CSV export to keep a
+backup. Each person using a separate browser profile has a separate local
+dataset. This deployment has no login or server-side database.
 
 ## 👨‍💻 Author
 

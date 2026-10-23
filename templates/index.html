@@ -1,518 +1,476 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-    <title>Budget Tracker | Dashboard</title>
-
-    <!-- Load our custom design -->
-    <link rel="stylesheet"
-          href="{{ url_for('static', filename='style.css') }}">
+    <title>Budget Tracker</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-
 <body>
-
-    <!-- Navigation -->
     <header class="navbar">
-        <a class="brand" href="{{ url_for('index') }}">
-            ◈ <span>Budget</span>Tracker
-        </a>
-
+        <a class="brand" href="/">◈ <span>Budget</span>Tracker</a>
         <nav class="nav-links">
-            <a href="{{ url_for('index') }}">Dashboard</a>
-            <a href="#add-expense">Add Expense</a>
+            <a href="/">Dashboard</a>
+            <a href="#add-expense">Add Transaction</a>
             <a href="#analysis">Analytics</a>
-            <a href="#transactions">Transactions</a>
-            <span class="nav-user">{{ g.user.email }}</span>
-            <form action="{{ url_for('logout') }}" method="POST">
-                <button class="nav-logout" type="submit">Log out</button>
-            </form>
+            <a href="#transactions">History</a>
         </nav>
     </header>
 
     <main class="container">
-
-        <!-- Welcome header -->
         <section class="page-header">
             <div>
-                <div class="eyebrow">Overview / Dashboard</div>
+                <div class="eyebrow">Browser-only budget tracker</div>
                 <h1>Manage your money <span class="blue">smarter.</span></h1>
-                <p>Track your spending. Build better financial habits.</p>
+                <p>Your entries save automatically in this browser. No account or database required.</p>
             </div>
-
-            <div class="date-box">
-                ◷ &nbsp; {{ today }}
-            </div>
+            <div class="date-box">◷ &nbsp; {{ today }}</div>
         </section>
 
-        <!-- Summary cards -->
-        <section class="stats-grid">
+        <div id="notice" class="flash-message" role="status" aria-live="polite" hidden></div>
+        <div class="local-warning">
+            Your data is stored only in this browser on this device. It will not sync to other browsers or devices.
+            Clearing browser data may erase it. Use CSV export to keep a backup.
+        </div>
 
+        <section class="stats-grid">
             <article class="stat-card">
                 <div class="stat-label">TOTAL INCOME</div>
-                <div class="stat-value green">
-                    ₹{{ "%.2f"|format(total_income) }}
-                </div>
-                <p class="stat-note">All income entries</p>
+                <div class="stat-value green" id="total-income">₹0.00</div>
+                <p class="stat-note">All saved income</p>
             </article>
-
             <article class="stat-card">
                 <div class="stat-label">TOTAL EXPENSES</div>
-                <div class="stat-value red">
-                    ₹{{ "%.2f"|format(total) }}
-                </div>
+                <div class="stat-value red" id="total-expenses">₹0.00</div>
                 <p class="stat-note">Based on current filters</p>
             </article>
-
             <article class="stat-card">
                 <div class="stat-label">BALANCE</div>
-                <div class="stat-value blue">
-                    ₹{{ "%.2f"|format(balance) }}
-                </div>
+                <div class="stat-value blue" id="balance">₹0.00</div>
                 <p class="stat-note">Income minus expenses</p>
             </article>
-
         </section>
 
-        <!-- Success and error messages -->
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="flash-message">
-                        ✓ &nbsp; {{ message }}
-                    </div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
-
-        <!-- Add expense and filter forms -->
         <section class="content-grid">
-
-            <!-- Add expense -->
             <article class="panel" id="add-expense">
                 <div class="panel-heading">
-                    <div class="panel-title">
-                        <span class="title-icon">+</span>
-                        Add New Expense
-                    </div>
+                    <div class="panel-title"><span class="title-icon">−</span> Add Expense</div>
                     <p>Record where your money goes.</p>
                 </div>
-
-                <form action="{{ url_for('add_expense') }}"
-                      method="POST">
-
-                    <label for="description">Description</label>
-                    <input type="text"
-                           id="description"
-                           name="description"
-                           placeholder="e.g. Monthly groceries"
-                           maxlength="100"
-                           required>
-
+                <form id="expense-form">
+                    <label for="expense-description">Description</label>
+                    <input id="expense-description" name="description" maxlength="100" required>
                     <div class="form-grid">
                         <div>
-                            <label for="amount">Amount (₹)</label>
-                            <input type="number"
-                                   id="amount"
-                                   name="amount"
-                                   placeholder="0.00"
-                                   min="0.01"
-                                   step="0.01"
-                                   required>
+                            <label for="expense-amount">Amount (₹)</label>
+                            <input id="expense-amount" name="amount" type="number" min="0.01" step="0.01" required>
                         </div>
-
                         <div>
-                            <label for="category">Category</label>
-                            <select id="category" name="category" required>
-                                {% for category in categories %}
-                                    <option value="{{ category }}">
-                                        {{ category }}
-                                    </option>
-                                {% endfor %}
+                            <label for="expense-category">Category</label>
+                            <select id="expense-category" name="category">
+                                {% for category in categories %}<option>{{ category }}</option>{% endfor %}
                             </select>
                         </div>
                     </div>
-
-                    <label for="date">Expense Date</label>
-                    <input type="date"
-                           id="date"
-                           name="date"
-                           value="{{ today }}"
-                           required>
-
-                    <button class="btn" type="submit">
-                        + Save Expense
-                    </button>
+                    <label for="expense-date">Date</label>
+                    <input id="expense-date" name="date" type="date" value="{{ today }}" required>
+                    <button class="btn" type="submit">+ Save Expense</button>
                 </form>
             </article>
 
             <article class="panel" id="add-income">
                 <div class="panel-heading">
-                    <div class="panel-title">
-                        <span class="title-icon">↗</span>
-                        Add New Income
-                    </div>
-                    <p>Record the money coming in.</p>
+                    <div class="panel-title"><span class="title-icon">↗</span> Add Income</div>
+                    <p>Record money coming in.</p>
                 </div>
-
-                <form action="{{ url_for('add_income') }}" method="POST">
+                <form id="income-form">
                     <label for="income-description">Description</label>
-                    <input type="text" id="income-description" name="description" placeholder="e.g. Salary payment" maxlength="100" required>
-
+                    <input id="income-description" name="description" maxlength="100" required>
                     <div class="form-grid">
                         <div>
                             <label for="income-amount">Amount (₹)</label>
-                            <input type="number" id="income-amount" name="amount" placeholder="0.00" min="0.01" step="0.01" required>
+                            <input id="income-amount" name="amount" type="number" min="0.01" step="0.01" required>
                         </div>
-
                         <div>
                             <label for="income-category">Category</label>
-                            <select id="income-category" name="category" required>
-                                {% for category in income_categories %}
-                                    <option value="{{ category }}">{{ category }}</option>
-                                {% endfor %}
+                            <select id="income-category" name="category">
+                                {% for category in income_categories %}<option>{{ category }}</option>{% endfor %}
                             </select>
                         </div>
                     </div>
-
-                    <label for="income-date">Income Date</label>
-                    <input type="date" id="income-date" name="date" value="{{ today }}" required>
-
+                    <label for="income-date">Date</label>
+                    <input id="income-date" name="date" type="date" value="{{ today }}" required>
                     <button class="btn" type="submit">+ Save Income</button>
                 </form>
             </article>
 
-            <!-- Filters and CSV export -->
             <article class="panel">
                 <div class="panel-heading">
-                    <div class="panel-title">
-                        <span class="title-icon">⌕</span>
-                        Filter & Export
-                    </div>
-                    <p>Find transactions for a selected period.</p>
+                    <div class="panel-title"><span class="title-icon">⌕</span> Filter &amp; Export</div>
+                    <p>Filter expenses by date and category.</p>
                 </div>
-
-                <form action="{{ url_for('index') }}" method="GET">
-
-                    <div class="form-grid">
-                        <div>
-                            <label for="start">Start Date</label>
-                            <input type="date"
-                                   id="start"
-                                   name="start"
-                                   value="{{ start_str }}">
-                        </div>
-
-                        <div>
-                            <label for="end">End Date</label>
-                            <input type="date"
-                                   id="end"
-                                   name="end"
-                                   value="{{ end_str }}">
-                        </div>
+                <div class="form-grid">
+                    <div>
+                        <label for="filter-start">Start Date</label>
+                        <input id="filter-start" type="date">
                     </div>
-
-                    <label for="categories">Expense Category</label>
-                    <select id="categories" name="categories">
-                        <option value="">All Categories</option>
-
-                        {% for category in categories %}
-                            <option value="{{ category }}"
-                                {% if selected_category == category %}
-                                    selected
-                                {% endif %}>
-                                {{ category }}
-                            </option>
-                        {% endfor %}
-                    </select>
-
-                    <div class="filter-actions">
-                        <button class="btn" type="submit">
-                            Apply Filters
-                        </button>
-
-                        <a class="btn btn-outline"
-                           href="{{ url_for('index') }}">
-                            Reset
-                        </a>
+                    <div>
+                        <label for="filter-end">End Date</label>
+                        <input id="filter-end" type="date">
                     </div>
-                </form>
-
-                <a class="export-link"
-                   href="{{ url_for(
-                       'export_csv',
-                       start=start_str,
-                       end=end_str,
-                       categories=selected_category
-                   ) }}">
-                    ↓ &nbsp; Download CSV Report
-                </a>
+                </div>
+                <label for="filter-category">Category</label>
+                <select id="filter-category">
+                    <option value="">All Categories</option>
+                    {% for category in categories %}<option>{{ category }}</option>{% endfor %}
+                </select>
+                <div class="filter-actions">
+                    <button class="btn" id="apply-filters" type="button">Apply Filters</button>
+                    <button class="btn btn-outline" id="reset-filters" type="button">Reset</button>
+                </div>
+                <button class="export-link" id="export-csv" type="button">↓ &nbsp; Download CSV Report</button>
             </article>
-
         </section>
 
-        <!-- Analytics -->
         <section id="analysis">
             <div class="section-header">
                 <div class="eyebrow">Your Financial Insights</div>
                 <h2>Spending Analytics</h2>
-                <p>Understand your spending patterns at a glance.</p>
+                <p>Based on filtered expenses.</p>
             </div>
-
             <div class="analytics-grid">
-
-                <!-- Category breakdown -->
                 <article class="panel">
                     <div class="panel-heading">
-                        <div class="panel-title">
-                            <span class="title-icon">◈</span>
-                            By Category
-                        </div>
-                        <p>Expense distribution by category.</p>
+                        <div class="panel-title">By Category</div>
+                        <p>Expense distribution.</p>
                     </div>
-
-                    {% if cat_labels %}
-                        <div class="table-wrap">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Category</th>
-                                        <th class="text-right">Amount</th>
-                                        <th class="text-right">Share</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {% for category in cat_labels %}
-                                        <tr>
-                                            <td>{{ category }}</td>
-
-                                            <td class="text-right amount">
-                                                ₹{{ "%.2f"|format(
-                                                    cat_values[loop.index0]
-                                                ) }}
-                                            </td>
-
-                                            <td class="text-right">
-                                                {% if total > 0 %}
-                                                    {{ "%.1f"|format(
-                                                        cat_values[loop.index0]
-                                                        / total * 100
-                                                    ) }}%
-                                                {% else %}
-                                                    0%
-                                                {% endif %}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="empty-state">
-                            <strong>No category data yet</strong>
-                            Add an expense to see your breakdown.
-                        </div>
-                    {% endif %}
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>Category</th><th class="text-right">Amount</th><th class="text-right">Share</th></tr></thead>
+                            <tbody id="category-summary"></tbody>
+                        </table>
+                    </div>
                 </article>
-
-                <!-- Daily breakdown -->
                 <article class="panel">
                     <div class="panel-heading">
-                        <div class="panel-title">
-                            <span class="title-icon">◷</span>
-                            Daily Spending
-                        </div>
-                        <p>Review expenses by date.</p>
+                        <div class="panel-title">Daily Spending</div>
+                        <p>Expenses grouped by date.</p>
                     </div>
-
-                    {% if day_labels %}
-                        <div class="table-wrap">
-                            <table class="data-table">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th class="text-right">Amount</th>
-                                    </tr>
-                                </thead>
-
-                                <tbody>
-                                    {% for day in day_labels %}
-                                        <tr>
-                                            <td>{{ day }}</td>
-                                            <td class="text-right amount">
-                                                ₹{{ "%.2f"|format(
-                                                    day_values[loop.index0]
-                                                ) }}
-                                            </td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="empty-state">
-                            <strong>No daily records yet</strong>
-                            Your daily totals will appear here.
-                        </div>
-                    {% endif %}
+                    <div class="table-wrap">
+                        <table class="data-table">
+                            <thead><tr><th>Date</th><th class="text-right">Amount</th></tr></thead>
+                            <tbody id="daily-summary"></tbody>
+                        </table>
+                    </div>
                 </article>
-
             </div>
         </section>
 
-        <!-- Income summary -->
         <section id="income-summary">
             <div class="section-header">
                 <div class="eyebrow">Cash Flow</div>
                 <h2>Income History</h2>
-                <p>{{ incomes|length }} income records</p>
+                <p id="income-count">0 income records</p>
             </div>
-
             <article class="panel">
-                {% if incomes %}
-                    <div class="table-wrap">
-                        <table class="data-table transaction-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Category</th>
-                                    <th class="text-right">Amount</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for income in incomes %}
-                                    <tr>
-                                        <td>{{ income.id }}</td>
-                                        <td>{{ income.date.isoformat() }}</td>
-                                        <td><strong>{{ income.description }}</strong></td>
-                                        <td><span class="category-badge">{{ income.category }}</span></td>
-                                        <td class="text-right amount">₹{{ "%.2f"|format(income.amount) }}</td>
-                                        <td>
-                                            <form action="{{ url_for('delete_income', id=income.id) }}" method="POST">
-                                                <button class="delete-btn" type="submit">Delete</button>
-                                            </form>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                {% else %}
-                    <div class="empty-state">
-                        <strong>No income records yet</strong>
-                        Add your first income entry to track your cash flow.
-                    </div>
-                {% endif %}
+                <div class="table-wrap">
+                    <table class="data-table transaction-table">
+                        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="text-right">Amount</th><th>Actions</th></tr></thead>
+                        <tbody id="income-rows"></tbody>
+                    </table>
+                </div>
+                <div id="income-empty" class="empty-state" hidden><strong>No income records yet</strong>Add your first income entry to track cash flow.</div>
             </article>
         </section>
 
-        <!-- Transaction history -->
         <section id="transactions">
             <div class="section-header">
                 <div class="eyebrow">Manage Your Records</div>
-                <h2>Transaction History</h2>
-                <p>
-                    {{ expenses|length }} matching expense records
-                </p>
+                <h2>Expense History</h2>
+                <p id="expense-count">0 expense records</p>
             </div>
-
             <article class="panel">
-                {% if expenses %}
-
-                    <div class="table-wrap">
-                        <table class="data-table transaction-table">
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Date</th>
-                                    <th>Description</th>
-                                    <th>Category</th>
-                                    <th class="text-right">Amount</th>
-                                    <th>Actions</th>
-                                </tr>
-                            </thead>
-
-                            <tbody>
-                                {% for expense in expenses %}
-                                    <tr>
-                                        <td>{{ expense.id }}</td>
-
-                                        <td>
-                                            {{ expense.date.isoformat() }}
-                                        </td>
-
-                                        <td>
-                                            <strong>
-                                                {{ expense.description }}
-                                            </strong>
-                                        </td>
-
-                                        <td>
-                                            <span class="category-badge">
-                                                {{ expense.category }}
-                                            </span>
-                                        </td>
-
-                                        <td class="text-right amount">
-                                            ₹{{ "%.2f"|format(
-                                                expense.amount
-                                            ) }}
-                                        </td>
-
-                                        <td>
-                                            <div class="actions">
-                                                <a class="btn btn-outline"
-                                                   href="{{ url_for(
-                                                       'edit',
-                                                       id=expense.id
-                                                   ) }}">
-                                                    Edit
-                                                </a>
-
-                                                <form method="POST"
-                                                      action="{{ url_for(
-                                                          'delete',
-                                                          id=expense.id
-                                                      ) }}">
-                                                    <button
-                                                        class="btn btn-danger"
-                                                        type="submit">
-                                                        Delete
-                                                    </button>
-                                                </form>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <p class="table-footer">
-                        Showing {{ expenses|length }} matching records.
-                    </p>
-
-                {% else %}
-                    <div class="empty-state">
-                        <strong>No transactions found</strong>
-                        Add your first expense or change your filters.
-                    </div>
-                {% endif %}
+                <div class="table-wrap">
+                    <table class="data-table transaction-table">
+                        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th class="text-right">Amount</th><th>Actions</th></tr></thead>
+                        <tbody id="expense-rows"></tbody>
+                    </table>
+                </div>
+                <div id="expense-empty" class="empty-state" hidden><strong>No expenses found</strong>Add an expense or change the filters.</div>
             </article>
         </section>
-
     </main>
+
+    <dialog id="edit-dialog" class="edit-dialog">
+        <form id="edit-form">
+            <div class="panel-heading">
+                <div class="panel-title">Edit Expense</div>
+                <p>Update this transaction.</p>
+            </div>
+            <label for="edit-description">Description</label>
+            <input id="edit-description" maxlength="100" required>
+            <div class="form-grid">
+                <div>
+                    <label for="edit-amount">Amount (₹)</label>
+                    <input id="edit-amount" type="number" min="0.01" step="0.01" required>
+                </div>
+                <div>
+                    <label for="edit-category">Category</label>
+                    <select id="edit-category">
+                        {% for category in categories %}<option>{{ category }}</option>{% endfor %}
+                    </select>
+                </div>
+            </div>
+            <label for="edit-date">Date</label>
+            <input id="edit-date" type="date" required>
+            <div class="filter-actions">
+                <button class="btn" type="submit">Save Changes</button>
+                <button class="btn btn-outline" id="cancel-edit" type="button">Cancel</button>
+            </div>
+        </form>
+    </dialog>
 
     <footer class="footer">
         <div class="brand">◈ Budget<span>Tracker</span></div>
         <p>Make every rupee count.</p>
     </footer>
 
+    <script>
+        (() => {
+            "use strict";
+
+            const storageKey = "budget-tracker-data-v1";
+            const expenseCategories = {{ categories | tojson }};
+            const incomeCategories = {{ income_categories | tojson }};
+            const today = {{ today | tojson }};
+            const notice = document.getElementById("notice");
+            const editDialog = document.getElementById("edit-dialog");
+            let data = { expenses: [], incomes: [] };
+            let activeFilters = { start: "", end: "", category: "" };
+            let editingExpenseId = null;
+
+            function showNotice(message, isError = false) {
+                notice.textContent = message;
+                notice.hidden = false;
+                notice.classList.toggle("flash-error", isError);
+            }
+
+            function saveData() {
+                try {
+                    localStorage.setItem(storageKey, JSON.stringify(data));
+                    showNotice("Saved automatically in this browser.");
+                    return true;
+                } catch (error) {
+                    showNotice("Could not save to this browser. Check available storage and browser privacy settings.", true);
+                    console.error("Could not save budget data to local storage.", error);
+                    return false;
+                }
+            }
+
+            function loadData() {
+                try {
+                    const saved = localStorage.getItem(storageKey);
+                    if (!saved) return;
+                    const parsed = JSON.parse(saved);
+                    if (!parsed || !Array.isArray(parsed.expenses) || !Array.isArray(parsed.incomes)) {
+                        throw new Error("Saved budget data has an invalid format.");
+                    }
+                    data = parsed;
+                } catch (error) {
+                    showNotice("Saved data could not be read. It has not been overwritten.", true);
+                    console.error("Could not load budget data from local storage.", error);
+                    throw error;
+                }
+            }
+
+            function escapeHtml(value) {
+                return String(value).replace(/[&<>"']/g, character => ({
+                    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+                })[character]);
+            }
+
+            function money(value) {
+                return `₹${Number(value).toFixed(2)}`;
+            }
+
+            function filteredExpenses() {
+                return data.expenses.filter(item =>
+                    (!activeFilters.start || item.date >= activeFilters.start) &&
+                    (!activeFilters.end || item.date <= activeFilters.end) &&
+                    (!activeFilters.category || item.category === activeFilters.category)
+                ).sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+            }
+
+            function makeRow(item, type) {
+                const isExpense = type === "expense";
+                const action = isExpense
+                    ? `<button class="btn btn-outline" type="button" data-edit="${escapeHtml(item.id)}">Edit</button>`
+                    : "";
+                return `<tr>
+                    <td>${escapeHtml(item.date)}</td>
+                    <td><strong>${escapeHtml(item.description)}</strong></td>
+                    <td><span class="category-badge">${escapeHtml(item.category)}</span></td>
+                    <td class="text-right amount">${money(item.amount)}</td>
+                    <td><div class="actions">${action}<button class="btn btn-danger" type="button" data-delete="${type}:${escapeHtml(item.id)}">Delete</button></div></td>
+                </tr>`;
+            }
+
+            function render() {
+                const expenses = filteredExpenses();
+                const incomes = [...data.incomes].sort((a, b) => b.date.localeCompare(a.date) || b.id - a.id);
+                const totalExpenses = expenses.reduce((sum, item) => sum + Number(item.amount), 0);
+                const totalIncome = data.incomes.reduce((sum, item) => sum + Number(item.amount), 0);
+                document.getElementById("total-income").textContent = money(totalIncome);
+                document.getElementById("total-expenses").textContent = money(totalExpenses);
+                document.getElementById("balance").textContent = money(totalIncome - totalExpenses);
+                document.getElementById("expense-count").textContent = `${expenses.length} matching expense records`;
+                document.getElementById("income-count").textContent = `${incomes.length} income records`;
+                document.getElementById("expense-rows").innerHTML = expenses.map(item => makeRow(item, "expense")).join("");
+                document.getElementById("income-rows").innerHTML = incomes.map(item => makeRow(item, "income")).join("");
+                document.getElementById("expense-empty").hidden = expenses.length > 0;
+                document.getElementById("income-empty").hidden = incomes.length > 0;
+
+                const byCategory = {};
+                const byDay = {};
+                expenses.forEach(item => {
+                    byCategory[item.category] = (byCategory[item.category] || 0) + Number(item.amount);
+                    byDay[item.date] = (byDay[item.date] || 0) + Number(item.amount);
+                });
+                document.getElementById("category-summary").innerHTML = Object.entries(byCategory).map(([category, amount]) =>
+                    `<tr><td>${escapeHtml(category)}</td><td class="text-right amount">${money(amount)}</td><td class="text-right">${totalExpenses ? (amount / totalExpenses * 100).toFixed(1) : "0.0"}%</td></tr>`
+                ).join("") || '<tr><td colspan="3">No category data yet.</td></tr>';
+                document.getElementById("daily-summary").innerHTML = Object.entries(byDay).sort(([a], [b]) => a.localeCompare(b)).map(([day, amount]) =>
+                    `<tr><td>${escapeHtml(day)}</td><td class="text-right amount">${money(amount)}</td></tr>`
+                ).join("") || '<tr><td colspan="2">No daily records yet.</td></tr>';
+            }
+
+            function addTransaction(event, type) {
+                event.preventDefault();
+                const form = event.currentTarget;
+                const fields = new FormData(form);
+                const description = String(fields.get("description") || "").trim();
+                const amount = Number(fields.get("amount"));
+                const category = String(fields.get("category") || "");
+                const transactionDate = String(fields.get("date") || "");
+                const allowedCategories = type === "expense" ? expenseCategories : incomeCategories;
+                if (!description || description.length > 100 || !Number.isFinite(amount) || amount <= 0 ||
+                    !allowedCategories.includes(category) || !/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)) {
+                    showNotice("Enter a valid description, amount, category, and date.", true);
+                    return;
+                }
+                const key = type === "expense" ? "expenses" : "incomes";
+                data[key].push({
+                    id: Math.max(
+                        Date.now(),
+                        data[key].reduce((largest, item) => Math.max(largest, Number(item.id) || 0), 0) + 1
+                    ),
+                    description, amount, category, date: transactionDate
+                });
+                if (saveData()) {
+                    form.reset();
+                    form.querySelector('[name="date"]').value = today;
+                    render();
+                } else {
+                    data[key].pop();
+                }
+            }
+
+            function exportCsv() {
+                const rows = [["DATE", "TYPE", "DESCRIPTION", "CATEGORY", "AMOUNT"]];
+                filteredExpenses().forEach(item => rows.push([item.date, "Expense", item.description, item.category, Number(item.amount).toFixed(2)]));
+                data.incomes.forEach(item => rows.push([item.date, "Income", item.description, item.category, Number(item.amount).toFixed(2)]));
+                const csv = rows.map(row => row.map(value => `"${String(value).replace(/"/g, '""')}"`).join(",")).join("\r\n");
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+                link.download = "budget-transactions.csv";
+                link.click();
+                window.setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+            }
+
+            document.getElementById("expense-form").addEventListener("submit", event => addTransaction(event, "expense"));
+            document.getElementById("income-form").addEventListener("submit", event => addTransaction(event, "income"));
+            document.getElementById("apply-filters").addEventListener("click", () => {
+                const filters = {
+                    start: document.getElementById("filter-start").value,
+                    end: document.getElementById("filter-end").value,
+                    category: document.getElementById("filter-category").value
+                };
+                if (filters.start && filters.end && filters.start > filters.end) {
+                    showNotice("Start date cannot be after end date.", true);
+                    return;
+                }
+                activeFilters = filters;
+                render();
+            });
+            document.getElementById("reset-filters").addEventListener("click", () => {
+                document.getElementById("filter-start").value = "";
+                document.getElementById("filter-end").value = "";
+                document.getElementById("filter-category").value = "";
+                activeFilters = { start: "", end: "", category: "" };
+                render();
+            });
+            document.getElementById("export-csv").addEventListener("click", exportCsv);
+            document.addEventListener("click", event => {
+                const deleteButton = event.target.closest("[data-delete]");
+                const editButton = event.target.closest("[data-edit]");
+                if (deleteButton) {
+                    const [type, id] = deleteButton.dataset.delete.split(":");
+                    const key = type === "expense" ? "expenses" : "incomes";
+                    const previousItems = data[key];
+                    data[key] = previousItems.filter(item => String(item.id) !== id);
+                    if (saveData()) {
+                        render();
+                    } else {
+                        data[key] = previousItems;
+                    }
+                }
+                if (editButton) {
+                    const item = data.expenses.find(expense => String(expense.id) === editButton.dataset.edit);
+                    if (!item) return;
+                    editingExpenseId = item.id;
+                    document.getElementById("edit-description").value = item.description;
+                    document.getElementById("edit-amount").value = item.amount;
+                    document.getElementById("edit-category").value = item.category;
+                    document.getElementById("edit-date").value = item.date;
+                    editDialog.showModal();
+                }
+            });
+            document.getElementById("cancel-edit").addEventListener("click", () => editDialog.close());
+            document.getElementById("edit-form").addEventListener("submit", event => {
+                event.preventDefault();
+                const item = data.expenses.find(expense => expense.id === editingExpenseId);
+                if (!item) {
+                    editDialog.close();
+                    return;
+                }
+                const description = document.getElementById("edit-description").value.trim();
+                const amount = Number(document.getElementById("edit-amount").value);
+                const category = document.getElementById("edit-category").value;
+                const transactionDate = document.getElementById("edit-date").value;
+                if (!description || description.length > 100 || !Number.isFinite(amount) || amount <= 0 ||
+                    !expenseCategories.includes(category) || !transactionDate) {
+                    showNotice("Enter a valid description, amount, category, and date.", true);
+                    return;
+                }
+                const previousItem = { ...item };
+                Object.assign(item, { description, amount, category, date: transactionDate });
+                if (saveData()) {
+                    editDialog.close();
+                    render();
+                } else {
+                    Object.assign(item, previousItem);
+                }
+            });
+
+            try {
+                loadData();
+                render();
+            } catch (error) {
+                document.querySelectorAll("form").forEach(form => {
+                    form.querySelectorAll("input, select, button[type=submit]").forEach(control => control.disabled = true);
+                });
+            }
+        })();
+    </script>
 </body>
 </html>
