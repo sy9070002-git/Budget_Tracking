@@ -139,15 +139,19 @@ python main.py
    framework preset as **Other** (or let Vercel detect Python), then deploy.
 4. If the project was already deployed, trigger a new deployment after pushing
    the corrected `requirements.txt`.
+5. For persistent expenses, create a hosted PostgreSQL database and add its
+   connection URL as the `DATABASE_URL` environment variable in the Vercel
+   project settings, then redeploy.
 
 The existing `vercel.json` sends incoming paths to the Flask app. If the
 deployed URL still shows Vercel's 404 page, check the deployment's build and
 runtime logs, confirm the project root contains `vercel.json`, and make sure
 you are opening the URL for the latest successful deployment.
 
-The app currently uses SQLite. Vercel's function filesystem is temporary, so
-expenses stored in the deployed app are not reliable across deployments or
-function instances. Use a hosted database for persistent production data.
+Without `DATABASE_URL`, the app uses SQLite locally and `/tmp` on Vercel.
+Vercel's `/tmp` storage is temporary and may not be shared between function
+instances, so it is only suitable for testing. Configure `DATABASE_URL` with a
+hosted PostgreSQL connection string to keep deployed expenses persistent.
 
 ## 👨‍💻 Author
 
