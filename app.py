@@ -1,8 +1,15 @@
 
-from flask import Flask, render_template, request, redirect, url_for, flash, make_response
+from functools import wraps
+
+from flask import (
+    Flask, render_template, request, redirect, url_for, flash,
+    make_response, session, g
+)
 from flask_sqlalchemy import SQLAlchemy
 from datetime import date, datetime
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
+from sqlalchemy.exc import IntegrityError
+from werkzeug.security import check_password_hash, generate_password_hash
 import csv
 import io
 import os
@@ -28,17 +35,30 @@ else:
 
 app.config["SQLALCHEMY_DATABASE_URI"] = database_url
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["SECRET_KEY"] = "BT-by-Sumit"
+secret_key = os.environ.get("SECRET_KEY")
+if not secret_key and os.environ.get("VERCEL"):
+    raise RuntimeError("Set SECRET_KEY in the Vercel project environment.")
+app.config["SECRET_KEY"] = secret_key or os.urandom(32)
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["SESSION_COOKIE_SECURE"] = bool(os.environ.get("VERCEL"))
 
 db = SQLAlchemy(app)
 
-# Expense database table
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(254), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
+
+
 class Expense(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     description = db.Column(db.String(100), nullable=False)
     date = db.Column(db.Date, nullable=False, default=date.today)
     category = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), index=True)
 
 
 class Income(db.Model):
@@ -47,11 +67,29 @@ class Income(db.Model):
     date = db.Column(db.Date, nullable=False, default=date.today)
     category = db.Column(db.String(100), nullable=False)
     amount = db.Column(db.Float, nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("user.id"), index=True)
 
 
-# Create the database table if it does not exist
+# Add ownership columns to databases created by earlier versions. Existing rows
+# remain unassigned because their owners cannot be determined safely.
 with app.app_context():
     db.create_all()
+    for table_name in ("expense", "income"):
+        columns = {
+            column["name"]
+            for column in inspect(db.engine).get_columns(table_name)
+        }
+        if "user_id" not in columns:
+            with db.engine.begin() as connection:
+                connection.execute(text(
+                    f"ALTER TABLE {table_name} "
+                    "ADD COLUMN user_id INTEGER REFERENCES \"user\" (id)"
+                ))
+        with db.engine.begin() as connection:
+            connection.execute(text(
+                f"CREATE INDEX IF NOT EXISTS ix_{table_name}_user_id "
+                f"ON {table_name} (user_id)"
+            ))
 
 
 # Available expense categories
@@ -65,6 +103,19 @@ IncomeCategories = [
 ]
 
 
+def login_required(view):
+    @wraps(view)
+    def wrapped_view(*args, **kwargs):
+        user_id = session.get("user_id")
+        g.user = db.session.get(User, user_id) if user_id else None
+        if g.user is None:
+            session.clear()
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped_view
+
+
 # Convert a date string into a date object
 def parse_date_or_none(value):
     if not value:
@@ -76,8 +127,76 @@ def parse_date_or_none(value):
         return None
 
 
-# Home page: show expenses, income, totals and chart data
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if session.get("user_id"):
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+
+        email_parts = email.rsplit("@", 1)
+        if (
+            len(email) > 254
+            or len(email_parts) != 2
+            or email.count("@") != 1
+            or not email_parts[0]
+            or "." not in email_parts[1]
+            or any(c.isspace() for c in email)
+        ):
+            flash("Enter a valid email address.")
+        elif len(password) < 8:
+            flash("Password must be at least 8 characters.")
+        else:
+            user = User(
+                email=email,
+                password_hash=generate_password_hash(password)
+            )
+            db.session.add(user)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+                if User.query.filter_by(email=email).first() is None:
+                    raise
+                flash("An account with that email already exists.")
+            else:
+                session.clear()
+                session["user_id"] = user.id
+                return redirect(url_for("index"))
+
+    return render_template("auth.html", mode="register")
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if session.get("user_id"):
+        return redirect(url_for("index"))
+
+    if request.method == "POST":
+        email = (request.form.get("email") or "").strip().lower()
+        password = request.form.get("password") or ""
+        user = User.query.filter_by(email=email).first()
+
+        if user is None or not check_password_hash(user.password_hash, password):
+            flash("Invalid email or password.")
+        else:
+            session.clear()
+            session["user_id"] = user.id
+            return redirect(url_for("index"))
+
+    return render_template("auth.html", mode="login")
+
+
+@app.route("/logout", methods=["POST"])
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
+
+
 @app.route("/")
+@login_required
 def index():
     start_str = (request.args.get("start") or "").strip()
     end_str = (request.args.get("end") or "").strip()
@@ -100,7 +219,7 @@ def index():
         end_str = ""
 
     # Apply filters to the expense query
-    q = Expense.query
+    q = Expense.query.filter_by(user_id=g.user.id)
 
     if start_date:
         q = q.filter(Expense.date >= start_date)
@@ -117,7 +236,7 @@ def index():
         Expense.date.desc(), Expense.id.desc()
     ).all()
 
-    incomes = Income.query.order_by(
+    incomes = Income.query.filter_by(user_id=g.user.id).order_by(
         Income.date.desc(), Income.id.desc()
     ).all()
 
@@ -129,7 +248,7 @@ def index():
     cat_q = db.session.query(
         Expense.category,
         func.sum(Expense.amount)
-    )
+    ).filter(Expense.user_id == g.user.id)
 
     if start_date:
         cat_q = cat_q.filter(Expense.date >= start_date)
@@ -149,7 +268,7 @@ def index():
     day_q = db.session.query(
         Expense.date,
         func.sum(Expense.amount)
-    )
+    ).filter(Expense.user_id == g.user.id)
 
     if start_date:
         day_q = day_q.filter(Expense.date >= start_date)
@@ -187,6 +306,7 @@ def index():
 
 # Add a new expense
 @app.route("/add", methods=["POST"])
+@login_required
 def add_expense():
     description = (request.form.get("description") or "").strip()
     category = (request.form.get("category") or "").strip()
@@ -225,7 +345,8 @@ def add_expense():
         description=description,
         category=category,
         amount=amount,
-        date=expense_date
+        date=expense_date,
+        user_id=g.user.id
     )
 
     db.session.add(expense)
@@ -236,6 +357,7 @@ def add_expense():
 
 
 @app.route("/add-income", methods=["POST"])
+@login_required
 def add_income():
     description = (request.form.get("description") or "").strip()
     category = (request.form.get("category") or "").strip()
@@ -267,7 +389,8 @@ def add_income():
         description=description,
         category=category,
         amount=amount,
-        date=income_date
+        date=income_date,
+        user_id=g.user.id
     )
 
     db.session.add(income)
@@ -279,8 +402,11 @@ def add_income():
 
 # Delete an expense
 @app.route("/delete/<int:id>", methods=["POST"])
+@login_required
 def delete(id):
-    expense = Expense.query.get_or_404(id)
+    expense = Expense.query.filter_by(
+        id=id, user_id=g.user.id
+    ).first_or_404()
 
     db.session.delete(expense)
     db.session.commit()
@@ -290,8 +416,11 @@ def delete(id):
 
 
 @app.route("/delete-income/<int:id>", methods=["POST"])
+@login_required
 def delete_income(id):
-    income = Income.query.get_or_404(id)
+    income = Income.query.filter_by(
+        id=id, user_id=g.user.id
+    ).first_or_404()
 
     db.session.delete(income)
     db.session.commit()
@@ -302,8 +431,11 @@ def delete_income(id):
 
 # Show the edit form
 @app.route("/edit/<int:id>", methods=["GET"])
+@login_required
 def edit(id):
-    expense = Expense.query.get_or_404(id)
+    expense = Expense.query.filter_by(
+        id=id, user_id=g.user.id
+    ).first_or_404()
 
     return render_template(
         "edit.html",
@@ -315,8 +447,11 @@ def edit(id):
 
 # Update an existing expense
 @app.route("/edit/<int:id>", methods=["POST"])
+@login_required
 def edit_post(id):
-    expense = Expense.query.get_or_404(id)
+    expense = Expense.query.filter_by(
+        id=id, user_id=g.user.id
+    ).first_or_404()
 
     description = (request.form.get("description") or "").strip()
     category = (request.form.get("category") or "").strip()
@@ -362,6 +497,7 @@ def edit_post(id):
 
 # Export filtered expenses as a CSV file
 @app.route("/export.csv")
+@login_required
 def export_csv():
     start_str = (request.args.get("start") or "").strip()
     end_str = (request.args.get("end") or "").strip()
@@ -371,7 +507,7 @@ def export_csv():
     end_date = parse_date_or_none(end_str)
 
     # Create the query and apply available filters
-    q = Expense.query
+    q = Expense.query.filter_by(user_id=g.user.id)
 
     if start_date:
         q = q.filter(Expense.date >= start_date)

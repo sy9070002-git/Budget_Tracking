@@ -25,6 +25,10 @@
             <a href="#add-expense">Add Expense</a>
             <a href="#analysis">Analytics</a>
             <a href="#transactions">Transactions</a>
+            <span class="nav-user">{{ g.user.email }}</span>
+            <form action="{{ url_for('logout') }}" method="POST">
+                <button class="nav-logout" type="submit">Log out</button>
+            </form>
         </nav>
     </header>
 

@@ -27,6 +27,7 @@ This project will be developed step-by-step, starting with a basic Python progra
 - View transaction history.
 - Categorize transactions.
 - Calculate the remaining balance.
+- Sign up and log in with private, user-specific income and expense histories.
 
 ### Planned Features
 - Save transactions using CSV files.
@@ -152,6 +153,19 @@ Without `DATABASE_URL`, the app uses SQLite locally and `/tmp` on Vercel.
 Vercel's `/tmp` storage is temporary and may not be shared between function
 instances, so it is only suitable for testing. Configure `DATABASE_URL` with a
 hosted PostgreSQL connection string to keep deployed expenses persistent.
+
+## 🔐 User accounts and existing data
+
+The dashboard requires an account. Create one at `/register`; each new expense
+and income entry is associated with the signed-in account, and history,
+analytics, edits, deletes, and CSV exports are scoped to that account. Passwords
+are stored as hashes, not plaintext.
+
+Set a long, randomly generated `SECRET_KEY` environment variable before
+deployment so Flask can securely sign login sessions. The app adds ownership
+columns to an existing database automatically. Older rows cannot be safely
+assigned to an account because they have no owner information, so they remain
+unassigned and are not displayed to any account.
 
 ## 👨‍💻 Author
 
